@@ -6,7 +6,7 @@
 >
 >**DOI:** [Insert DOI of paper here]
 >
->**Paper authors:** Steven Kerr, Chris Robertson, Eleftheria Vasieliou, Aziz Sheikh, 
+>**Paper authors:** Steven Kerr, Chris Robertson, Sam Hillman, Zoe Grange, Aziz Sheikh, 
 >
 
 ### Funding
