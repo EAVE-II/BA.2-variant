@@ -103,7 +103,7 @@ summary_factorlist_wt <- function(data, dependent, explanatory){
         mutate_if(is.numeric, ~formatC(round(.,0), format = "f", big.mark = ",", drop0trailing = TRUE)) %>%
         mutate(n_perc := paste0(n, " (", perc,"%)")) %>%
         select(-n, -perc) %>%
-        rename("levels"=explanatory[i], !!dependent := n_perc) %>%
+        dplyr::rename("levels"=explanatory[i], !!dependent := n_perc) %>%
         mutate("characteristic" = explanatory[i]) %>%
         relocate(characteristic)
       
@@ -119,7 +119,7 @@ summary_factorlist_wt <- function(data, dependent, explanatory){
         mutate(n_perc := paste0(n, " (", perc,"%)")) %>%
         select(-n, -perc) %>%
         pivot_wider(names_from = !!sym(dependent), values_from = n_perc) %>%
-        rename("levels"=explanatory[i]) %>%
+        dplyr::rename("levels"=explanatory[i]) %>%
         mutate("characteristic" = explanatory[i]) %>%
         relocate(characteristic)
       

@@ -5,11 +5,23 @@
 ##              baseline cohort
 ##########################################################
 
-
 # Libraries
 library("finalfit")
+library(tidyverse)
+library(survival)
+library(lubridate)
+
+Location = '/conf/'
+
+setwd(paste0(Location, 'EAVE/GPanalysis/analyses/BA.2-variant'))
 
 source('./code/hospitalisation_death/00_functions.R')
+
+df_cohort = readRDS('./data/df_cohort.rds')
+
+df_pos = readRDS('./data/df_pos.rds')
+
+df_seq = readRDS('./data/df_seq.rds')
 
 ############## 0 Functions #######################
 
@@ -53,6 +65,45 @@ plot_HR <- function(model_fit, term){
   }
 }
 
+a_begin <- as.Date("2021-11-01")
+# End date is maximum of admission date and discharge date
+a_end <- max(c(max(df_seq$admission_date, na.rm=T), max(df_seq$discharge_date, na.rm=T)))
+
+# Create output directory
+output_dir = paste0("./output/", a_begin, "-", a_end)
+if (!dir.exists(output_dir)) {dir.create(output_dir)}
+
+####################### 0 Exploration ################################################
+
+# Investigations on whether to use s gene positve/negative as a proxy for
+# BA.2, B.1.1.529
+# The issue is that s gene positive is also delta.
+cutoff_date = as.Date('2022-01-06')
+
+df_seq_post = filter(df_seq, specimen_date >= cutoff_date)
+
+df_pos_post = filter(df_pos, specimen_date >= cutoff_date)
+
+# How good a proxy is s gene for BA.2, B.1.1.529
+sgene_variant_table =  as.data.frame.matrix( table(df_seq_post$sgene_classification, df_seq_post$variant) )
+
+write.csv(sgene_variant_table, paste0(output_dir, "/sgene_variant_table_death_hosp.csv"))
+
+# How much of each variant do we have in the cutoff sequencing data
+table(df_seq_post %>% pull(variant)) 
+
+# How many events in the cutoff sequencing data
+events_table = as.data.frame.matrix(table(df_seq_post$hosp_death_covid, df_seq_post$variant))
+
+write.csv(events_table , paste0(output_dir, "/events_table .csv"))
+
+# How many events in the cutoff positive test data
+table(df_pos_post $hosp_death_covid, df_pos_post $sgene_classification)
+
+# How many events in the non cutoff sequencing data
+table(df_seq$hosp_death_covid, df_seq$variant)
+
+
 ##### 1 Descriptive tables ####
 
 # Uses function summary_factorlist_wt from 00_functions.R
@@ -67,8 +118,8 @@ explanatory <- c("Total",
                  "ageYear", 
                  "age_grp",  
                  "vacc_type_comb",
-                 "simd", 
-                 "ur6_2016", 
+                 "simd2020_sc_quintile", 
+                 "ur6_2016_name", 
                  "n_risk_gps",
                  "n_tests", 
                  "ave_hh_age", 
@@ -86,7 +137,7 @@ summary_tbl_wt_chrt$Characteristic[duplicated(summary_tbl_wt_chrt$Characteristic
 
 summary_tbl_wt_chrt[1, 'Levels'] <- ''
 
-write.csv(summary_tbl_wt_chrt , paste0("./output/", a_begin, "-", a_end, "/summary_table_weights_cohort.csv"), row.names = F)
+write.csv(summary_tbl_wt_chrt , paste0(output_dir, "/summary_table_weights_cohort.csv"), row.names = F)
 
 
 ## Summary table for all who tested positive
@@ -110,8 +161,8 @@ explanatory <- c("Sex",
                  "hosp_covid_emerg",
                  "death_covid",
                  "death",
-                 "simd", 
-                 "ur6_2016", 
+                 "simd2020_sc_quintile", 
+                 "ur6_2016_name", 
                  "n_risk_gps",
                  "n_tests", 
                  "ave_hh_age", 
@@ -146,19 +197,19 @@ write.csv(summary_tbl_seq, paste0("./output/", a_begin, "-", a_end, "/summary_ta
 # Combine those who were positive and those who were sequenced
 summary_tbl_wt_pos[1, 'Levels'] <- 'F'
 
-comb_table <- summary_tbl_wt_pos %>%
-                      mutate(Levels =  gsub("mean.sd","Mean (SD)", Levels),
-                             Characteristic = ifelse(Characteristic == '', NA, Characteristic)) %>% 
-                      fill(Characteristic, .direction = 'down' ) %>%
-                      right_join( summary_tbl_seq %>% 
-                        mutate(Characteristic = ifelse(Characteristic == '', NA, Characteristic)) %>%
-                        fill(Characteristic, .direction = 'down'), na_matches = 'na') %>%
-                      mutate(Characteristic = ifelse(!duplicated(Characteristic), Characteristic, ''  )    )
-   
-comb_table <- comb_table[c(139, 1:138), ]
-               
-
-write.csv(comb_table, paste0("./output/", a_begin, "-", a_end, "/comb_table.csv"), row.names = F)
+# comb_table <- summary_tbl_wt_pos %>%
+#                       mutate(Levels =  gsub("mean.sd","Mean (SD)", Levels),
+#                              Characteristic = ifelse(Characteristic == '', NA, Characteristic)) %>% 
+#                       fill(Characteristic, .direction = 'down' ) %>%
+#                       right_join(summary_tbl_seq %>% 
+#                         mutate(Characteristic = ifelse(Characteristic == '', NA, Characteristic)) %>%
+#                         fill(Characteristic, .direction = 'down'), na_matches = 'na') %>%
+#                       mutate(Characteristic = ifelse(!duplicated(Characteristic), Characteristic, ''  )    )
+#    
+# 
+# comb_table <- comb_table[c(139, 1:138), ]
+#        
+# write.csv(comb_table, paste0(output_dir, "/comb_table.csv"), row.names = F)
 
 
 ##################### 2 Descriptive graphs ########################
@@ -199,7 +250,7 @@ grid %>%  ggplot(aes(x=specimen_date, y=N, colour = sequenced)) + geom_point() +
   labs(x="Specimen date",y ="Number", colour="Sequenced", title="Positive tests by day") + 
   theme(legend.title = element_blank()) 
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/pos_tests_by_day.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/pos_tests_by_day.png"), width=14, height=10, unit="cm")
 
 
 # Cases by day and variant
@@ -208,7 +259,7 @@ z <- df_seq %>%
   group_by(specimen_date, variant) %>% 
   dplyr::summarise(N=n()) 
 
-grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'AY.4.2', 'other'))
+grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'B.1.1.529', 'BA.2', 'other'))
 
 names(grid) <- c('specimen_date', 'variant')  
 
@@ -229,7 +280,7 @@ grid %>%  ggplot(aes(x=specimen_date, y=N, colour = variant)) + geom_point() +
   labs(x="Specimen Date",y ="Number", title="Number of cases per day", colour="Variant") +
   scale_y_log10()
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/cases_by_day.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/cases_by_day.png"), width=14, height=10, unit="cm")
 
 
 
@@ -241,7 +292,7 @@ z <- df_seq %>% filter(hosp_death_covid==1 & in_hosp_at_test == 0 & lab == 'lh')
   dplyr::summarise(N=n())  
 
 
-grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'AY.4.2', 'other'))
+grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'B.1.1.529', 'BA.2', 'other'))
 
 names(grid) <- c('event_date', 'variant')  
 
@@ -254,7 +305,7 @@ grid %>%  ggplot(aes(x=event_date, y=N, colour = variant)) + geom_point() +
   geom_smooth(xseq = smooth_start:smooth_end) +
   labs(x="Event date",y ="Number", colour="Variant", title="Emergency covid hospital admissions or covid deaths by day")
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_by_variant_day.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/hosp_death_by_variant_day.png"), width=14, height=10, unit="cm")
 
 
 
@@ -267,7 +318,7 @@ fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  variant "))
 
 z.tab <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data
 
-write.csv(z.tab, paste0("./output/", a_begin, "-", a_end, "/pyears_by_variant.csv"))
+write.csv(z.tab, paste0(output_dir, "/pyears_by_variant.csv"))
 
 
 # Person years to event by variant and vaccination status
@@ -279,11 +330,11 @@ fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  variant_vs "))
 
 z.tab <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data
 
-write.csv(z.tab, paste0("./output/", a_begin, "-", a_end, "/pyears_by_variant_vaccine_status.csv"))
+write.csv(z.tab, paste0(output_dir, "/pyears_by_variant_vaccine_status.csv"))
 
 
 
-# Person years to event by variant and vaccination status by sex, simd and number 
+# Person years to event by variant and vaccination status by sex, simd2020_sc_quintile and number 
 # of risk groups
 
 fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~ Sex "))
@@ -291,10 +342,10 @@ fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~ Sex "))
 z.tab1 <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data %>%
           rename(Variable = Sex)
 
-fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  simd  "))
+fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  simd2020_sc_quintile  "))
 
 z.tab2 <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data %>%
-  rename(Variable = simd)
+  rename(Variable = simd2020_sc_quintile)
 
 fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  n_risk_gps "))
 
@@ -304,29 +355,30 @@ z.tab3 <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', dat
 z.tab <- bind_rows(z.tab1, z.tab2, z.tab3) %>%
           mutate(pyears = round(pyears))
 
-write.csv(z.tab, paste0("./output/", a_begin, "-", a_end, "/pyears_by_sex_simd_n_risk_gps.csv"))
+write.csv(z.tab, paste0(output_dir, "/pyears_by_sex_simd2020_sc_quintile_n_risk_gps.csv"))
 
 
 ################### 3 Analysis ##########################
 
 # Hazard Ratios for emergency covid hospitalisation or covid death from community
 fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  
-      pspline(ageYear) + pspline(days) + Sex + simd + n_risk_gps + variant +vs "))
+      pspline(ageYear) + pspline(days) + Sex + simd2020_sc_quintile + n_risk_gps + variant +vs "))
 
-z.fit <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 & lab == 'lh')
+z.fit <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 
+               & lab == 'lh')
 
 z <- fun.extract(z.fit)
 
-write.csv(z, paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR.csv"))
+write.csv(z, paste0(output_dir, "/hosp_death_HR.csv"))
 
 # Plot HRs for spline terms
 plot_HR(z.fit, 1)
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_age.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/hosp_death_HR_age.png"), width=14, height=10, unit="cm")
 
 plot_HR(z.fit, 2)
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_days.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/hosp_death_HR_days.png"), width=14, height=10, unit="cm")
 
 
 
@@ -336,22 +388,22 @@ ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_days.png"), widt
 # with interaction between variant and vaccine status
 
 fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~   
-    pspline(ageYear) + pspline(days)  + Sex  + simd +  n_risk_gps + variant + variant:vs "))
+    pspline(ageYear) + pspline(days)  + Sex  + simd2020_sc_quintile +  n_risk_gps + variant + variant:vs "))
 
 z.fit <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 & lab == 'lh')
 z <- fun.extract(z.fit)
 
 
 
-write.csv(z, paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_int.csv"))
+write.csv(z, paste0(output_dir, "/hosp_death_HR_int.csv"))
 
 # Plot HRs for spline terms
 plot_HR(z.fit, 1)
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_int_age.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/hosp_death_HR_int_age.png"), width=14, height=10, unit="cm")
 
 plot_HR(z.fit, 2)
 
-ggsave(paste0("./output/", a_begin, "-", a_end, "/hosp_death_HR_int_days.png"), width=14, height=10, unit="cm")
+ggsave(paste0(output_dir, "/hosp_death_HR_int_days.png"), width=14, height=10, unit="cm")
 
 
