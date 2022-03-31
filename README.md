@@ -1,8 +1,8 @@
 # EAVE II Analysis Repository
-## [Insert full title here]  
+## Covid-19 Vaccine Effectiveness against Hospitalization and Death from the Omicron BA.2 Varian 
 
 ### Paper Details
-> **Short title:** B.1.1.529 sub-variants
+> **Short title:** BA.2 variant
 >
 >**DOI:** [Insert DOI of paper here]
 >
