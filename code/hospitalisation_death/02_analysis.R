@@ -303,7 +303,8 @@ grid <- grid %>%
 grid %>%  ggplot(aes(x=event_date, y=N, colour = variant)) + geom_point() +
   scale_y_continuous(limits = c(0, 12), breaks = 0:max(z$N + 1)) +
   geom_smooth(xseq = smooth_start:smooth_end) +
-  labs(x="Event date",y ="Number", colour="Variant", title="Emergency covid hospital admissions or covid deaths by day")
+  labs(x="Event date",y ="Number", colour="Variant", title="Emergency covid hospital admissions or covid deaths by day") +
+  facet_wrap(~variant)
 
 ggsave(paste0(output_dir, "/hosp_death_by_variant_day.png"), width=14, height=10, unit="cm")
 
@@ -319,6 +320,19 @@ fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  variant "))
 z.tab <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data
 
 write.csv(z.tab, paste0(output_dir, "/pyears_by_variant.csv"))
+
+
+
+# Person years to event by vaccination status
+z.rv <- "hosp_death_covid" 
+z.rv.time <- "time_to_hosp_death" 
+
+fmla.plot <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  vs "))
+
+z.tab <- pyears(fmla.plot, data=df_seq, in_hosp_at_test == 0 & lab == 'lh', data.frame=TRUE)$data
+
+write.csv(z.tab, paste0(output_dir, "/pyears_by_vaccine_status.csv"))
+
 
 
 # Person years to event by variant and vaccination status

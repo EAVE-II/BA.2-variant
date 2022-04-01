@@ -100,6 +100,15 @@ write.csv(study_cohort, paste0(output_dir, '/study_cohort.csv'), row.names = FAL
 #BA.2 variant
 ##########################
 
+
+outcome_table <- df_tnd %>% 
+  filter(outcome %in% c("negative", "BA.2") ) %>%
+  mutate(result = as.factor(result)) %>%
+  summary_factorlist('outcome', explanatory, p=TRUE, add_dependent_label=TRUE)
+
+write.csv(outcome_table, paste0(output_dir, '/tnd_outcome_table_BA2.csv'), row.names = FALSE)
+
+
 # model 1
 m1 <- gam(result ~ s(days) + s(age) + vacc_status + subject_sex + simd2020_sc_quintile + n_risk_gps
           , family=binomial, data=df_tnd, subset=outcome %in% c("negative", "BA.2"))
@@ -119,6 +128,13 @@ write.csv(m2_result, paste0(output_dir, '/model_BA2_vs2.csv.csv'), row.names = F
 ##########################
 # Omicron variant
 ##########################
+
+outcome_table <- df_tnd %>% 
+  filter(outcome %in% c("negative", "B.1.1.529") ) %>%
+  mutate(result = as.factor(result)) %>%
+  summary_factorlist('outcome', explanatory, p=TRUE, add_dependent_label=TRUE)
+
+write.csv(outcome_table, paste0(output_dir, '/tnd_outcome_table_BA1.csv'), row.names = FALSE)
 
 m3 <- gam(result ~ s(days) + s(age) + vacc_status + subject_sex + simd2020_sc_quintile + n_risk_gps
           , family=binomial, data=df_tnd, subset=outcome %in% c("negative", "B.1.1.529"))
