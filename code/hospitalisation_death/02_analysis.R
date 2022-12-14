@@ -67,16 +67,18 @@ plot_HR <- function(model_fit, term){
 
 a_begin <- as.Date("2021-11-01")
 # End date is maximum of admission date and discharge date
-a_end <- max(c(max(df_seq$admission_date, na.rm=T), max(df_seq$discharge_date, na.rm=T)))
+# a_end <- max(c(max(df_seq$admission_date, na.rm=T), max(df_seq$discharge_date, na.rm=T)))
+a_end = as.Date("2022-03-20")
 
 # Create output directory
-output_dir = paste0("./output/", a_begin, "-", a_end)
+# output_dir = paste0("./output/", a_begin, "-", a_end)
+output_dir = paste0("./output/", a_begin, "-", a_end, '_rerun')
 if (!dir.exists(output_dir)) {dir.create(output_dir)}
 
 ####################### 0 Exploration ################################################
 
 # Investigations on whether to use s gene positve/negative as a proxy for
-# BA.2, B.1.1.529
+# BA.2, BA.1
 # The issue is that s gene positive is also delta.
 cutoff_date = as.Date('2022-01-06')
 
@@ -84,7 +86,7 @@ df_seq_post = filter(df_seq, specimen_date >= cutoff_date)
 
 df_pos_post = filter(df_pos, specimen_date >= cutoff_date)
 
-# How good a proxy is s gene for BA.2, B.1.1.529
+# How good a proxy is s gene for BA.2, BA.1
 sgene_variant_table =  as.data.frame.matrix( table(df_seq_post$sgene_classification, df_seq_post$variant) )
 
 write.csv(sgene_variant_table, paste0(output_dir, "/sgene_variant_table_death_hosp.csv"))
@@ -180,7 +182,7 @@ summary_tbl_wt_pos$Characteristic[duplicated(summary_tbl_wt_pos$Characteristic)]
 
 summary_tbl_wt_pos[1, 'Levels'] <- ''
 
-write.csv(summary_tbl_wt_pos , paste0("./output/", a_begin, "-", a_end, "/summary_table_weights_positive.csv"), row.names = F)
+write.csv(summary_tbl_wt_pos , paste0(output_dir, "/summary_table_weights_positive.csv"), row.names = F)
 
 
 
@@ -190,7 +192,7 @@ summary_tbl_seq <- summary_factorlist(df_seq %>% mutate(Q_DIAG_CKD_LEVEL = as.fa
                                       "variant", explanatory = explanatory, add_col_totals = TRUE) %>%
                   rename(Characteristic = label, Levels = levels)
 
-write.csv(summary_tbl_seq, paste0("./output/", a_begin, "-", a_end, "/summary_table_weights_seq.csv"), row.names = F)
+write.csv(summary_tbl_seq, paste0(output_dir, "/summary_table_weights_seq.csv"), row.names = F)
 
 
 
@@ -259,7 +261,7 @@ z <- df_seq %>%
   group_by(specimen_date, variant) %>% 
   dplyr::summarise(N=n()) 
 
-grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'B.1.1.529', 'BA.2', 'other'))
+grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'BA.1', 'BA.2', 'other'))
 
 names(grid) <- c('specimen_date', 'variant')  
 
@@ -292,7 +294,7 @@ z <- df_seq %>% filter(hosp_death_covid==1 & in_hosp_at_test == 0 & lab == 'lh')
   dplyr::summarise(N=n())  
 
 
-grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'B.1.1.529', 'BA.2', 'other'))
+grid <- expand.grid(seq(a_begin, a_end, by="days"), c('delta', 'BA.1', 'BA.2', 'other'))
 
 names(grid) <- c('event_date', 'variant')  
 
@@ -419,5 +421,85 @@ ggsave(paste0(output_dir, "/hosp_death_HR_int_age.png"), width=14, height=10, un
 plot_HR(z.fit, 2)
 
 ggsave(paste0(output_dir, "/hosp_death_HR_int_days.png"), width=14, height=10, unit="cm")
+
+
+
+
+
+
+
+
+
+# Investigation of interaction nterm
+
+# Same as before, except only include BA.1 and BA.2
+
+# No interaction
+fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  
+                               pspline(ageYear) + pspline(days) + Sex + simd2020_sc_quintile + n_risk_gps + variant +vs "))
+
+z.fit1 <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 
+               & lab == 'lh' & variant %in% c("BA.1", "BA.2"))
+
+z <- fun.extract(z.fit1)
+
+write.csv(z, paste0(output_dir, "/hosp_death_HR_BA_only.csv"))
+
+# With interaction
+
+fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~   
+    pspline(ageYear) + pspline(days)  + Sex  + simd2020_sc_quintile +  n_risk_gps + variant + variant:vs "))
+
+z.fit2 <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 & lab == 'lh' 
+                & variant %in% c("BA.1", "BA.2"))
+
+z <- fun.extract(z.fit2)
+
+write.csv(z, paste0(output_dir, "/hosp_death_HR_int_BA_only.csv"))
+
+
+anova(z.fit1, z.fit2)
+
+
+
+
+
+# Simpler vaccination status
+
+df_seq = mutate(df_seq, vs3 = case_when( !is.na(date_vacc_3) ~  'v3',
+                                         !is.na(date_vacc_2) ~  'v2',
+                                         !is.na(date_vacc_1) ~  'v1',
+                                         TRUE ~ 'uv'))
+
+
+# No interaction
+fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~  
+                               pspline(ageYear) + pspline(days) + Sex + simd2020_sc_quintile + n_risk_gps + variant +vs3 "))
+
+z.fit1 <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 
+                & lab == 'lh' & variant %in% c("BA.1", "BA.2"))
+
+z <- fun.extract(z.fit1)
+
+write.csv(z, paste0(output_dir, "/hosp_death_HR_BA_only_vs3.csv"))
+
+# With interaction
+
+fmla.final <- as.formula(paste("Surv(",z.rv.time,",",z.rv,") ~   
+    pspline(ageYear) + pspline(days)  + Sex  + simd2020_sc_quintile +  n_risk_gps + variant + variant:vs3 "))
+
+z.fit2 <- coxph(fmla.final , data=df_seq, subset = in_hosp_at_test == 0 & lab == 'lh' 
+                & variant %in% c("BA.1", "BA.2"))
+
+z <- fun.extract(z.fit2)
+
+write.csv(z, paste0(output_dir, "/hosp_death_HR_int_BA_only_vs3.csv"))
+
+
+anova(z.fit1, z.fit2)
+
+
+
+
 
 

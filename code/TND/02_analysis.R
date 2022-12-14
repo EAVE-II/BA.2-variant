@@ -50,7 +50,8 @@ create_results_table <- function(model){
 }
 
 #load TND dataset
-df_tnd <- readRDS('./data/df_tnd.rds')
+df_tnd <- readRDS('./data/df_tnd.rds') %>%
+      mutate(simd2020_sc_quintile = as.factor(simd2020_sc_quintile))
 
 
 ####################### 0 Exploration ################################################
@@ -82,7 +83,7 @@ write.csv(vacc_variant_table, paste0(output_dir, '/vacc_variant_table.csv'), row
 
 #Population characteristics by test for Delta and Delta Plus datasets
 dependent <- "outcome"
-explanatory <- c("age", "subject_sex", "simd2020_sc_quintile", "EAVE_Smoke", "EAVE_BP",
+explanatory <- c("age", "subject_sex", "simd2020_sc_quintile", "vacc_status", "vacc_status_2", "EAVE_Smoke", "EAVE_BP",
                  "Q_DIAG_AF", "Q_DIAG_ASTHMA","Q_DIAG_BLOOD_CANCER","Q_DIAG_CCF","Q_DIAG_CEREBRALPALSY",        
                  "Q_DIAG_CHD","Q_DIAG_CIRRHOSIS","Q_DIAG_CONGEN_HD","Q_DIAG_COPD","Q_DIAG_DEMENTIA",         
                  "Q_DIAG_DIABETES_1", "Q_DIAG_DIABETES_2","Q_DIAG_EPILEPSY","Q_DIAG_FRACTURE",           

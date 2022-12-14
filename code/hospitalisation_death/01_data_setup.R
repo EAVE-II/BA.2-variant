@@ -299,7 +299,6 @@ df_pos <- df_pos %>%
   relocate(EAVE_LINKNO)
 
 
-
 ########## 4 Create study datatset of all who were virally sequenced ########################
 
 # Gather data on all people who have been virally sequenced.
@@ -310,7 +309,9 @@ df_seq <- wgs %>%
       # Create columns for lab type, and variants
       mutate(lab = if_else(test_result_record_source == "ECOSS", "nhs","lh"),
              variant = case_when(is.na(VariantofInterest) ~ "not_sequenced",
-                             VariantofInterest=="VOC-21APR-02" ~ "delta",
+                    # The naming has changed since the initial run
+                    #         VariantofInterest=="VOC-21APR-02" ~ "delta",
+                              VariantofInterest=="V-21APR-02" ~ "delta",
                              TRUE ~ "other")) %>%
       select(EAVE_LINKNO, specimen_date, VariantShorthand, variant, lab) %>%
       # Combine with cohort data
@@ -346,8 +347,9 @@ a_end <- max(c(max(df_seq$admission_date, na.rm=T), max(df_seq$discharge_date, n
 
 # Add variables  
 df_seq <- df_seq %>%        
-      mutate(
-        variant = ifelse(VariantShorthand %in% c('B.1.1.529', 'BA.2'), VariantShorthand, variant),
+      mutate(# The VariantShorthand feels seems to have changed since the initial run
+        # variant = ifelse(VariantShorthand %in% c('B.1.1.529', 'BA.2'), VariantShorthand, variant),
+        variant = ifelse(VariantShorthand %in% c('BA.1', 'BA.2'), VariantShorthand, variant),
         ageYear = ifelse(ageYear >= 100, 100, ageYear),
         days = as.numeric(specimen_date -min(specimen_date, na.rm = TRUE)),
         death = if_else(is.na(NRS.Date.Death), 0L, 1L),
@@ -411,7 +413,8 @@ df_seq <- df_seq %>%
              vt = fct_relevel(vt, "uv"),
              vs = fct_relevel(vs, "uv"),
       # Make Omicron the baseline variant cateogry
-             variant = fct_relevel(variant, "B.1.1.529")) %>%
+             # variant = fct_relevel(variant, "B.1.1.529")) %>%
+               variant = fct_relevel(variant, "BA.1")) %>%
       # Assume hospitalisation/death is 0.1 days after test if they happen on same day
       mutate(time_to_hosp = if_else(time_to_hosp==0,0.1,time_to_hosp),
             time_to_death = if_else(time_to_death==0,0.1,time_to_death),
